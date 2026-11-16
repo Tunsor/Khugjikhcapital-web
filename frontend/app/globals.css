@@ -1,0 +1,571 @@
+
+@import "tailwindcss";
+
+/* ========================================
+   01. FONT FACES — ZONA PRO
+======================================== */
+
+@font-face {
+  font-family: "Zona Pro";
+  src: url("/fonts/Intelligent Design - ZonaPro-Regular.otf")
+    format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Zona Pro";
+  src: url("/fonts/Intelligent Design - ZonaPro-SemiBold.otf")
+    format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Zona Pro";
+  src: url("/fonts/Intelligent Design - ZonaPro-Bold.otf")
+    format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ========================================
+   02. FONT FACES — RUBIK
+======================================== */
+
+@font-face {
+  font-family: "Rubik";
+  src: url("/fonts/Rubik-Regular.ttf")
+    format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rubik";
+  src: url("/fonts/Rubik-Medium.ttf")
+    format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rubik";
+  src: url("/fonts/Rubik-SemiBold.ttf")
+    format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rubik";
+  src: url("/fonts/Rubik-Bold.ttf")
+    format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ========================================
+   03. DESIGN TOKENS
+======================================== */
+
+:root {
+  /* Brand colors */
+  --brand-orange: #F4AC38;
+  --brand-gray: #A7ADAF;
+  --brand-blue: #003189;
+  --brand-dark: #0D1216;
+
+  --brand-primary: #003189;
+  --brand-accent: #F4AC38;
+  --brand-light: #EDF3FC;
+
+  /* Backgrounds */
+  --background: #FFFFFF;
+  --background-soft: #F8FAFD;
+  --background-gray: #EEF0F0;
+
+  --surface: #FFFFFF;
+  --surface-muted: #F8FAFD;
+
+  /* Text */
+  --foreground: #0D1216;
+  --text-secondary: #626A6D;
+  --text-muted: #657487;
+
+  /* Actions */
+  --primary: #003189;
+  --primary-hover: #00266C;
+  --primary-dark: #00266C;
+
+  --accent: #F4AC38;
+  --accent-hover: #E49B26;
+
+  /* Borders */
+  --border: #DDE0E1;
+  --border-dark: rgba(255, 255, 255, 0.15);
+  --border-color: #E4EAF4;
+
+  /* Border radius */
+  --radius-button: 10px;
+  --radius-input: 10px;
+  --radius-card: 17px;
+  --radius-panel: 22px;
+
+  /* Layout */
+  --container: 1440px;
+
+  /* Typography */
+  --font-primary: "Zona Pro", "Rubik", Arial, sans-serif;
+  --font-secondary: "Rubik", Arial, sans-serif;
+}
+
+/* ========================================
+   04. TAILWIND CSS 4 THEME
+======================================== */
+
+@theme inline {
+  --font-sans: var(--font-primary);
+
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-light: var(--brand-light);
+  --color-brand-dark: var(--brand-dark);
+}
+
+/* ========================================
+   05. BASE STYLES
+======================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-primary);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-primary);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+  }
+
+  button:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* ========================================
+   06. FONT UTILITIES
+======================================== */
+
+@utility font-primary {
+  font-family: var(--font-primary);
+}
+
+@utility font-secondary {
+  font-family: var(--font-secondary);
+}
+
+/* ========================================
+   07. CUSTOMER WEBSITE LAYOUT
+======================================== */
+
+.customer-site {
+  min-height: 100vh;
+  width: 100%;
+  overflow-wrap: break-word;
+  font-family: var(--font-primary);
+}
+
+.container-main {
+  width: min(calc(100% - 48px), var(--container));
+  margin-inline: auto;
+}
+
+/* ========================================
+   08. TYPOGRAPHY
+======================================== */
+
+.heading-serif {
+  font-family: var(--font-primary);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.kc-heading {
+  color: var(--brand-primary);
+  font-family: var(--font-primary);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* ========================================
+   09. TEXT SELECTION
+======================================== */
+
+::selection {
+  background: var(--accent);
+  color: var(--brand-dark);
+}
+
+/* ========================================
+   10. SHARED DESIGN COMPONENTS
+======================================== */
+
+@layer components {
+  /* Cards */
+
+  .kc-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 28px;
+
+    transition:
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .kc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px #00318910;
+  }
+
+  /* Panels */
+
+  .kc-panel {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-panel);
+    overflow: hidden;
+  }
+
+  /* Primary button */
+
+  .kc-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    background: var(--brand-accent);
+    color: var(--brand-dark);
+
+    border: 1px solid transparent;
+    border-radius: var(--radius-button);
+
+    padding: 14px 21px;
+
+    font-family: var(--font-primary);
+    font-weight: 700;
+    cursor: pointer;
+
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .kc-btn-primary:hover {
+    background: var(--accent-hover);
+  }
+
+  .kc-btn-primary:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 3px;
+  }
+
+  /* Outline button */
+
+  .kc-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    background: white;
+    color: var(--brand-primary);
+
+    border: 1px solid #CAD7EC;
+    border-radius: var(--radius-button);
+
+    padding: 14px 21px;
+
+    font-family: var(--font-primary);
+    font-weight: 600;
+    cursor: pointer;
+
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .kc-btn-outline:hover {
+    background: var(--brand-light);
+    border-color: var(--brand-primary);
+  }
+
+  .kc-btn-outline:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 3px;
+  }
+
+  /* Form inputs */
+
+  .kc-input {
+    width: 100%;
+
+    background: white;
+    color: var(--foreground);
+
+    border: 1px solid #CAD7EC;
+    border-radius: var(--radius-input);
+
+    padding: 12px 15px;
+
+    font-family: var(--font-secondary);
+    outline: none;
+
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .kc-input:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px #00318915;
+  }
+
+  .kc-input::placeholder {
+    color: #8794A5;
+  }
+
+  /* Sections */
+
+  .kc-section {
+    background: var(--surface-muted);
+    padding: 72px 0;
+  }
+}
+
+/* ========================================
+   11. LOAN CALCULATOR RANGE
+======================================== */
+
+.loan-range {
+  appearance: none;
+  -webkit-appearance: none;
+
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+
+  outline: none;
+  cursor: pointer;
+}
+
+.loan-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+
+  width: 16px;
+  height: 16px;
+
+  border-radius: 999px;
+  background: var(--brand-orange);
+
+  border: 3px solid var(--brand-blue);
+  box-shadow: 0 0 0 1px var(--brand-orange);
+
+  cursor: pointer;
+}
+
+.loan-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+
+  border-radius: 999px;
+  background: var(--brand-orange);
+
+  border: 3px solid var(--brand-blue);
+  box-shadow: 0 0 0 1px var(--brand-orange);
+
+  cursor: pointer;
+}
+
+.loan-range:focus-visible {
+  outline: 2px solid var(--brand-orange);
+  outline-offset: 6px;
+}
+
+/* ========================================
+   12. CUSTOMER TYPOGRAPHY SCALE
+
+   Preserve existing visual sizing.
+   Applies only to .customer-site.
+======================================== */
+
+@layer utilities {
+  .customer-site .text-\[8px\] {
+    font-size: 10px;
+  }
+
+  .customer-site .text-\[9px\] {
+    font-size: 11px;
+  }
+
+  .customer-site .text-\[10px\] {
+    font-size: 12px;
+  }
+
+  .customer-site .text-\[11px\] {
+    font-size: 13px;
+  }
+
+  .customer-site .text-\[12px\] {
+    font-size: 14px;
+  }
+
+  .customer-site .text-\[13px\] {
+    font-size: 15px;
+  }
+
+  .customer-site .text-\[14px\] {
+    font-size: 16px;
+  }
+
+  .customer-site .text-\[17px\] {
+    font-size: 18px;
+  }
+
+  .customer-site .text-\[20px\] {
+    font-size: 21px;
+  }
+
+  .customer-site .text-\[22px\] {
+    font-size: 23px;
+  }
+
+  .customer-site .text-\[25px\] {
+    font-size: 26px;
+  }
+}
+
+/* ========================================
+   13. RESPONSIVE — TABLET
+======================================== */
+
+@media (max-width: 1024px) {
+  .container-main {
+    width: min(calc(100% - 40px), var(--container));
+  }
+}
+
+/* ========================================
+   14. RESPONSIVE — MOBILE
+======================================== */
+
+@media (max-width: 768px) {
+  .container-main {
+    width: min(calc(100% - 32px), var(--container));
+  }
+
+  .kc-section {
+    padding: 52px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .container-main {
+    width: calc(100% - 32px);
+  }
+
+  .customer-site {
+    font-size: 14px;
+  }
+
+  .kc-card {
+    padding: 22px;
+  }
+
+  .customer-site input,
+  .customer-site select,
+  .customer-site textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* ========================================
+   15. RESPONSIVE — SMALL PHONES
+======================================== */
+
+@media (max-width: 380px) {
+  .container-main {
+    width: calc(100% - 24px);
+  }
+}
+
+/* ========================================
+   16. ACCESSIBILITY
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .customer-site *,
+  .customer-site *::before,
+  .customer-site *::after {
+    scroll-behavior: auto;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

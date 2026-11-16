@@ -1,0 +1,2670 @@
+﻿
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\applications\[id]\status\route.ts ==========
+
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+
+const allowedStatuses = [
+  "new",
+  "reviewing",
+  "approved",
+  "rejected",
+] as const;
+
+type ApplicationStatus = (typeof allowedStatuses)[number];
+
+export async function PATCH(
+  request: NextRequest,
+  context: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  try {
+    const { id } = await context.params;
+
+    if (!id || id.length > 128) {
+      return NextResponse.json(
+        { error: "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð½ ID Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 1. Session ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. Admin ÑÑ€Ñ…Ð¸Ð¹Ð³ ÑÐµÑ€Ð²ÐµÑ€ Ñ‚Ð°Ð»Ð´ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError) {
+      console.error(
+        "Admin authorization error:",
+        adminError
+      );
+
+      return NextResponse.json(
+        { error: "Ð­Ñ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ… Ò¯ÐµÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    if (isAdmin !== true) {
+      return NextResponse.json(
+        { error: "Ð¥Ð°Ð½Ð´Ð°Ñ… ÑÑ€Ñ…Ð³Ò¯Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. JSON body ÑˆÐ°Ð»Ð³Ð°Ñ…
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "JSON Ó©Ð³Ó©Ð³Ð´Ó©Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      Array.isArray(body) ||
+      !("status" in body)
+    ) {
+      return NextResponse.json(
+        { error: "Ð¢Ó©Ð»Ó©Ð² Ð·Ð°Ð°Ð³Ð°Ð°Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    const requestedStatus = body.status;
+
+    if (
+      typeof requestedStatus !== "string" ||
+      !allowedStatuses.includes(
+        requestedStatus as ApplicationStatus
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Ð—Ó©Ð²ÑˆÓ©Ó©Ñ€Ó©Ð³Ð´Ó©Ó©Ð³Ò¯Ð¹ Ñ‚Ó©Ð»Ó©Ð² Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 4. Ð¢Ó©Ð»Ó©Ð² ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…
+    // Supabase RLS Ð¼Ó©Ð½ ÑÐ½Ñ UPDATE-Ð³ Ð·Ó©Ð²ÑˆÓ©Ó©Ñ€Ó©Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.
+    const { data, error: updateError } =
+    await supabase.rpc("update_application_status", {
+        p_application_id: id,
+        p_new_status: requestedStatus,
+    });
+
+    const application = data?.[0] ?? null;
+
+    if (updateError) {
+      console.error(
+        "Application status update error:",
+        updateError
+      );
+
+      return NextResponse.json(
+        { error: "Ð¢Ó©Ð»Ó©Ð² ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…ÑÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    if (!application) {
+      return NextResponse.json(
+        {
+          error:
+            "Ð¥Ò¯ÑÑÐ»Ñ‚ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹ ÑÑÐ²ÑÐ» Ó©Ó©Ñ€Ñ‡Ð»Ó©Ñ… ÑÑ€Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        application,
+        message: "Ð¢Ó©Ð»Ó©Ð² Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÐ³Ð´Ð»ÑÑ.",
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Status update unexpected error:",
+      error
+    );
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\calculator-settings\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+type CalculatorSetting = {
+  id: string;
+  loan_name: string;
+  monthly_interest_rate: number;
+  max_dti_ratio: number;
+  min_term_months: number;
+  max_term_months: number;
+  max_loan_amount: number | null;
+  is_active: boolean;
+};
+
+const allowedIds = ["property", "car", "phone"];
+
+const CACHE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+};
+
+async function getAdminClient() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { supabase, status: 401 };
+  }
+
+  const { data: isAdmin, error: adminError } =
+    await supabase.rpc("is_admin");
+
+  if (adminError || isAdmin !== true) {
+    return { supabase, status: 403 };
+  }
+
+  return { supabase, status: 200 };
+}
+
+// ======================================
+// GET - Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾Ð½ÑƒÑƒÐ´Ñ‹Ð³ ÑƒÐ½ÑˆÐ¸Ñ…
+// ======================================
+
+export async function GET() {
+  try {
+    const { supabase, status } = await getAdminClient();
+
+    if (status !== 200) {
+      return NextResponse.json(
+        { error: "Ð¥Ð°Ð½Ð´Ð°Ñ… ÑÑ€Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°." },
+        {
+          status,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("loan_calculator_settings")
+      .select("*")
+      .order("id");
+
+    if (error) {
+      console.error("Calculator settings GET database error:", {
+        code: error.code,
+        message: error.message,
+      });
+
+      return NextResponse.json(
+        {
+          error:
+            "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ð¾Ð¾Ñ†Ð¾Ð¾Ð»ÑƒÑƒÑ€Ñ‹Ð½ Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾Ð³ ÑƒÐ½ÑˆÐ¸Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        },
+        {
+          status: 500,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    return NextResponse.json(
+      { settings: data ?? [] },
+      {
+        headers: CACHE_HEADERS,
+      }
+    );
+  } catch (error) {
+    console.error("Calculator settings GET error:", error);
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      {
+        status: 500,
+        headers: CACHE_HEADERS,
+      }
+    );
+  }
+}
+
+// ======================================
+// PATCH - Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…
+// ======================================
+
+export async function PATCH(request: Request) {
+  try {
+    const { supabase, status } = await getAdminClient();
+
+    if (status !== 200) {
+      return NextResponse.json(
+        { error: "Ð¥Ð°Ð½Ð´Ð°Ñ… ÑÑ€Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°." },
+        {
+          status,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // JSON Ñ…Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð½ Ð±Ò¯Ñ‚ÑÑ† ÑˆÐ°Ð»Ð³Ð°Ñ…
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "JSON Ó©Ð³Ó©Ð³Ð´Ó©Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return NextResponse.json(
+        { error: "Ð‘ÑƒÑ€ÑƒÑƒ Ñ…Ò¯ÑÑÐ»Ñ‚." },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    const input = body as Record<string, unknown>;
+
+    // Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ó©Ñ€Ó©Ð» ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (
+      typeof input.id !== "string" ||
+      !allowedIds.includes(input.id)
+    ) {
+      return NextResponse.json(
+        { error: "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ó©Ñ€Ó©Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ð—Ð°Ð°Ð²Ð°Ð» Ñ‚Ð¾Ð¾Ð½ ÑƒÑ‚Ð³Ð°Ñ‚Ð°Ð¹ Ð±Ð°Ð¹Ñ… Ñ‚Ð°Ð»Ð±Ð°Ñ€ÑƒÑƒÐ´
+    const requiredNumbers = [
+      "monthly_interest_rate",
+      "max_dti_ratio",
+      "min_term_months",
+      "max_term_months",
+    ] as const;
+
+    for (const field of requiredNumbers) {
+      if (
+        typeof input[field] !== "number" ||
+        !Number.isFinite(input[field])
+      ) {
+        return NextResponse.json(
+          { error: `${field} Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.` },
+          {
+            status: 400,
+            headers: CACHE_HEADERS,
+          }
+        );
+      }
+    }
+
+    const rate = input.monthly_interest_rate as number;
+    const dti = input.max_dti_ratio as number;
+    const minTerm = input.min_term_months as number;
+    const maxTerm = input.max_term_months as number;
+
+    // Ð¡Ð°Ñ€Ñ‹Ð½ Ñ…Ò¯Ò¯ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (rate < 0 || rate > 100) {
+      return NextResponse.json(
+        { error: "Ð¡Ð°Ñ€Ñ‹Ð½ Ñ…Ò¯Ò¯ 0â€“100% Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹." },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ó¨Ñ€, Ð¾Ñ€Ð»Ð¾Ð³Ñ‹Ð½ Ñ…Ð°Ñ€ÑŒÑ†Ð°Ð° ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (dti <= 0 || dti > 100) {
+      return NextResponse.json(
+        {
+          error:
+            "Ó¨Ñ€-Ð¾Ñ€Ð»Ð¾Ð³Ñ‹Ð½ Ñ…Ð°Ñ€ÑŒÑ†Ð°Ð° 0-ÑÑÑ Ð¸Ñ…, 100%-Ð¸Ð°Ñ Ñ…ÑÑ‚Ñ€ÑÑ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.",
+        },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ…ÑƒÐ³Ð°Ñ†Ð°Ð° ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (
+      !Number.isInteger(minTerm) ||
+      !Number.isInteger(maxTerm) ||
+      minTerm < 1 ||
+      maxTerm < minTerm ||
+      maxTerm > 360
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ…ÑƒÐ³Ð°Ñ†Ð°Ð° 1â€“360 ÑÐ°Ñ€Ñ‹Ð½ Ñ…Ð¾Ð¾Ñ€Ð¾Ð½Ð´ Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.",
+        },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ð´ÑÑÐ´ Ñ…ÑÐ¼Ð¶ÑÑ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const maxLoan = input.max_loan_amount;
+
+    if (
+      maxLoan !== null &&
+      maxLoan !== undefined &&
+      (
+        typeof maxLoan !== "number" ||
+        !Number.isFinite(maxLoan) ||
+        maxLoan <= 0
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ð´ÑÑÐ´ Ñ…ÑÐ¼Ð¶ÑÑ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ð˜Ð´ÑÐ²Ñ…Ñ‚ÑÐ¹ ÑÑÑÑ…Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (typeof input.is_active !== "boolean") {
+      return NextResponse.json(
+        {
+          error: "Ð˜Ð´ÑÐ²Ñ…Ñ‚ÑÐ¹ ÑÑÑÑ… ÑƒÑ‚Ð³Ð° Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        {
+          status: 400,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    // Ð—Ó©Ð²ÑˆÓ©Ó©Ñ€Ó©Ð³Ð´ÑÓ©Ð½ Ñ‚Ð°Ð»Ð±Ð°Ñ€ÑƒÑƒÐ´Ñ‹Ð³ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…
+    const updates: Partial<CalculatorSetting> & {
+      updated_at: string;
+    } = {
+      monthly_interest_rate: rate,
+      max_dti_ratio: dti,
+      min_term_months: minTerm,
+      max_term_months: maxTerm,
+      max_loan_amount:
+        typeof maxLoan === "number" ? maxLoan : null,
+      is_active: input.is_active,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("loan_calculator_settings")
+      .update(updates)
+      .eq("id", input.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Calculator settings PATCH database error:", {
+        code: error.code,
+        message: error.message,
+      });
+
+      return NextResponse.json(
+        {
+          error:
+            "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ‚Ð¾Ð¾Ñ†Ð¾Ð¾Ð»ÑƒÑƒÑ€Ñ‹Ð½ Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾Ð³ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…ÑÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        },
+        {
+          status: 500,
+          headers: CACHE_HEADERS,
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        setting: data,
+      },
+      {
+        status: 200,
+        headers: CACHE_HEADERS,
+      }
+    );
+  } catch (error) {
+    console.error("Calculator settings PATCH error:", error);
+
+    return NextResponse.json(
+      {
+        error: "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð³ Ð±Ð¾Ð»Ð¾Ð²ÑÑ€ÑƒÑƒÐ»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+      },
+      {
+        status: 500,
+        headers: CACHE_HEADERS,
+      }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\documents\[id]\route.ts ==========
+import { NextResponse } from "next/server";
+
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+const BUCKET_NAME = "loan-documents";
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        "Cache-Control": "private, no-store",
+      },
+    }
+  );
+}
+
+export async function GET(
+  _request: Request,
+  context: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  try {
+    const { id } = await context.params;
+
+    // 1. Document ID ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (!UUID_REGEX.test(id)) {
+      return jsonError(
+        "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð½ ID Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        400
+      );
+    }
+
+    // 2. Ð¥ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡ Ð½ÑÐ²Ñ‚ÑÑ€ÑÑÐ½ ÑÑÑÑ…
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return jsonError(
+        "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹.",
+        401
+      );
+    }
+
+    // 3. Admin ÑÑ€Ñ…Ð¸Ð¹Ð³ ÑÐµÑ€Ð²ÐµÑ€ Ð´ÑÑÑ€ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError) {
+      console.error(
+        "Document admin check error:",
+        adminError
+      );
+
+      return jsonError(
+        "Ð­Ñ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        500
+      );
+    }
+
+    if (isAdmin !== true) {
+      return jsonError(
+        "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð¸Ð³ Ò¯Ð·ÑÑ… ÑÑ€Ñ…Ð³Ò¯Ð¹.",
+        403
+      );
+    }
+
+    // 4. Service role Ð·Ó©Ð²Ñ…Ó©Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°ÑÐ½Ñ‹ Ð´Ð°Ñ€Ð°Ð°
+    const admin = createAdminClient();
+
+    // 5. Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð½ Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð°Ð²Ð°Ñ…
+    const {
+      data: document,
+      error: documentError,
+    } = await admin
+      .from("application_documents")
+      .select(
+        "id, application_id, file_path, file_name, file_type"
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (documentError) {
+      console.error(
+        "Document lookup error:",
+        documentError
+      );
+
+      return jsonError(
+        "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð½ Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð°Ð²Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        500
+      );
+    }
+
+    if (!document) {
+      return jsonError(
+        "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð¸Ð³ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹.",
+        404
+      );
+    }
+
+    // 6. Ð¥Ð¾Ð»Ð±Ð¾Ð³Ð´Ð¾Ñ… Ð·ÑÑÐ»Ð¸Ð¹Ð½ Ñ…Ò¯ÑÑÐ»Ñ‚ Ð±Ð°Ð¹Ð³Ð°Ð° ÑÑÑÑ…
+    const {
+      data: application,
+      error: applicationError,
+    } = await admin
+      .from("loan_applications")
+      .select("id")
+      .eq("id", document.application_id)
+      .maybeSingle();
+
+    if (applicationError) {
+      console.error(
+        "Document application lookup error:",
+        applicationError
+      );
+
+      return jsonError(
+        "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ…Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        500
+      );
+    }
+
+    if (!application) {
+      return jsonError(
+        "Ð¥Ð¾Ð»Ð±Ð¾Ð³Ð´Ð¾Ñ… Ð·ÑÑÐ»Ð¸Ð¹Ð½ Ñ…Ò¯ÑÑÐ»Ñ‚ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹.",
+        404
+      );
+    }
+
+    // 7. Ð¤Ð°Ð¹Ð»Ñ‹Ð³ private bucket-ÑÑÑ Ð°Ð²Ð°Ñ…
+    const {
+      data: file,
+      error: downloadError,
+    } = await admin.storage
+      .from(BUCKET_NAME)
+      .download(document.file_path);
+
+    if (downloadError || !file) {
+      console.error(
+        "Private document download error:",
+        downloadError
+      );
+
+      return jsonError(
+        "Ð¤Ð°Ð¹Ð»Ñ‹Ð³ Ð½ÑÑÑ… Ð±Ð¾Ð»Ð¾Ð¼Ð¶Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°.",
+        404
+      );
+    }
+
+    // 8. Ð¤Ð°Ð¹Ð»Ñ‹Ð½ Ñ‚Ó©Ñ€Ð»Ð¸Ð¹Ð³ Ð°ÑŽÑƒÐ»Ð³Ò¯Ð¹Ð³ÑÑÑ€ Ñ‚Ð¾Ð´Ð¾Ñ€Ñ…Ð¾Ð¹Ð»Ð¾Ñ…
+    // Ð—Ó©Ð²Ñ…Ó©Ð½ Ð·Ó©Ð²ÑˆÓ©Ó©Ñ€Ó©Ð³Ð´ÑÓ©Ð½ Ñ‚Ó©Ñ€Ð»Ò¯Ò¯Ð´Ð¸Ð¹Ð³ Ð°ÑˆÐ¸Ð³Ð»Ð°Ð½Ð°.
+    const allowedTypes = new Set([
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+    ]);
+
+    const contentType = allowedTypes.has(
+      document.file_type
+    )
+      ? document.file_type
+      : "application/octet-stream";
+
+    // Ð¤Ð°Ð¹Ð»Ñ‹Ð½ Ð½ÑÑ€Ð¸Ð¹Ð³ HTTP header-Ð´ ÑˆÑƒÑƒÐ´ Ð°ÑˆÐ¸Ð³Ð»Ð°Ñ…Ð³Ò¯Ð¹.
+    // ID Ð°ÑˆÐ¸Ð³Ð»Ð°ÑÐ½Ð°Ð°Ñ€ header injection Ð±Ð¾Ð»Ð¾Ð½
+    // Ñ‚ÑƒÑÐ³Ð°Ð¹ Ñ‚ÑÐ¼Ð´ÑÐ³Ñ‚Ð¸Ð¹Ð½ Ð°ÑÑƒÑƒÐ´Ð»Ð°Ð°Ñ ÑÑÑ€Ð³Ð¸Ð¹Ð»Ð½Ñ.
+    const extension =
+      contentType === "application/pdf"
+        ? ".pdf"
+        : contentType === "image/jpeg"
+          ? ".jpg"
+          : contentType === "image/png"
+            ? ".png"
+            : ".bin";
+
+    const safeFileName = `document-${id}${extension}`;
+
+    // attachment Ð½ÑŒ browser Ð´ÑÑÑ€ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð°Ð°Ñ€
+    // Ð°Ð¶Ð¸Ð»Ð»Ð°Ñ… ÐºÐ¾Ð½Ñ‚ÐµÐ½Ñ‚Ñ‹Ð½ ÑÑ€ÑÐ´ÑÐ»Ð¸Ð¹Ð³ Ð±ÑƒÑƒÑ€ÑƒÑƒÐ»Ð½Ð°.
+    return new NextResponse(file, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition":
+          `attachment; filename="${safeFileName}"`,
+        "Content-Length": String(file.size),
+        "Cache-Control":
+          "private, no-store, max-age=0",
+        "X-Content-Type-Options": "nosniff",
+        "X-Robots-Tag": "noindex, nofollow",
+        "Referrer-Policy": "no-referrer",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Secure document endpoint error:",
+      error
+    );
+
+    return jsonError(
+      "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+      500
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\news\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const imageTypes: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const allowedCategories = [
+  "company",
+  "announcement",
+  "promotion",
+  "event",
+];
+
+function getText(form: FormData, key: string) {
+  const value = form.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+
+    // 1. ÐÑÐ²Ñ‚Ñ€ÑÐ»Ñ‚ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError || isAdmin !== true) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Ð¤Ð¾Ñ€Ð¼Ñ‹Ð½ Ð¼ÑÐ´ÑÑÐ»ÑÐ»
+    const form = await request.formData();
+
+    const title = getText(form, "title");
+    const summary = getText(form, "summary");
+    const content = getText(form, "content");
+    const category = getText(form, "category");
+    const status = getText(form, "status");
+    const image = form.get("image");
+
+    if (
+      !title ||
+      title.length > 200 ||
+      summary.length > 500 ||
+      !content
+    ) {
+      return NextResponse.json(
+        { error: "Ð“Ð°Ñ€Ñ‡Ð¸Ð³, Ñ‚Ð°Ð¹Ð»Ð±Ð°Ñ€ ÑÑÐ²ÑÐ» Ð°Ð³ÑƒÑƒÐ»Ð³Ð° Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    if (!allowedCategories.includes(category)) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð°Ð½Ð³Ð¸Ð»Ð°Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    if (status !== "draft" && status !== "published") {
+      return NextResponse.json(
+        { error: "ÐÐ¸Ð¹Ñ‚Ð»ÑÐ»Ð¸Ð¹Ð½ Ñ‚Ó©Ð»Ó©Ð² Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 4. ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ ID Ð±Ð¾Ð»Ð¾Ð½ slug
+    const newsId = crypto.randomUUID();
+    const slug = `news-${newsId}`;
+
+    let imageUrl: string | null = null;
+    let uploadedImagePath: string | null = null;
+
+    // 5. Ð—ÑƒÑ€Ð°Ð³ Ð±Ð°Ð¹Ð²Ð°Ð» Storage-Ð´ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    if (image !== null) {
+      if (!(image instanceof File)) {
+        return NextResponse.json(
+          { error: "Ð—ÑƒÑ€Ð³Ð¸Ð¹Ð½ Ñ„Ð°Ð¹Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+          { status: 400 }
+        );
+      }
+
+      if (image.size > 0) {
+        const extension = imageTypes[image.type];
+
+        if (!extension || image.size > MAX_IMAGE_SIZE) {
+          return NextResponse.json(
+            {
+              error:
+                "Ð—Ó©Ð²Ñ…Ó©Ð½ JPG, PNG, WebP Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ‚Ð°Ð¹, 5 MB Ñ…Ò¯Ñ€Ñ‚ÑÐ»Ñ… Ð·ÑƒÑ€Ð°Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð°.",
+            },
+            { status: 400 }
+          );
+        }
+
+        const imagePath = `${newsId}/cover.${extension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("company-news")
+          .upload(imagePath, image, {
+            contentType: image.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error("News image upload:", uploadError);
+
+          return NextResponse.json(
+            { error: "Ð—ÑƒÑ€Ð°Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+            { status: 500 }
+          );
+        }
+
+        uploadedImagePath = imagePath;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("company-news")
+          .getPublicUrl(imagePath);
+
+        imageUrl = publicUrlData.publicUrl;
+      }
+    }
+
+    // 6. ÐœÑÐ´ÑÑÐ³ Ñ…Ò¯ÑÐ½ÑÐ³Ñ‚ÑÐ´ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const { error: insertError } = await supabase
+      .from("company_news")
+      .insert({
+        id: newsId,
+        slug,
+        title,
+        summary: summary || null,
+        content,
+        category,
+        image_url: imageUrl,
+        status,
+        published_at:
+          status === "published"
+            ? new Date().toISOString()
+            : null,
+      });
+
+    if (insertError) {
+      console.error("Company news insert:", insertError);
+
+      // ÐœÑÐ´ÑÑ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ð³Ð´Ð°Ð°Ð³Ò¯Ð¹ Ð±Ð¾Ð» upload Ñ…Ð¸Ð¹ÑÑÐ½ Ð·ÑƒÑ€Ð³Ð¸Ð¹Ð³ Ñ†ÑÐ²ÑÑ€Ð»ÑÑ…
+      if (uploadedImagePath) {
+        const { error: cleanupError } =
+          await supabase.storage
+            .from("company-news")
+            .remove([uploadedImagePath]);
+
+        if (cleanupError) {
+          console.error("News image cleanup:", cleanupError);
+        }
+      }
+
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        id: newsId,
+        message:
+          status === "published"
+            ? "ÐœÑÐ´ÑÑ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ Ð½Ð¸Ð¹Ñ‚Ð»ÑÐ³Ð´Ð»ÑÑ."
+            : "ÐœÑÐ´ÑÑ Ð½Ð¾Ð¾Ñ€Ð¾Ð³ Ð±Ð°Ð¹Ð´Ð»Ð°Ð°Ñ€ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ð³Ð´Ð»Ð°Ð°.",
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Create company news:", error);
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\news\[id]\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+const allowedCategories = [
+  "company",
+  "announcement",
+  "promotion",
+  "event",
+];
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function PATCH(
+  request: Request,
+  context: RouteContext
+) {
+  try {
+    const { id } = await context.params;
+
+    if (!uuidPattern.test(id)) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ ID Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // 1. ÐÑÐ²Ñ‚Ñ€ÑÐ»Ñ‚ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError || isAdmin !== true) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. JSON Ð¼ÑÐ´ÑÑÐ»ÑÐ» ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const body: unknown = await request.json();
+
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      Array.isArray(body)
+    ) {
+      return NextResponse.json(
+        { error: "Ð˜Ð»Ð³ÑÑÑÑÐ½ Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    const values = body as Record<string, unknown>;
+
+    const title =
+      typeof values.title === "string"
+        ? values.title.trim()
+        : "";
+
+    const summary =
+      typeof values.summary === "string"
+        ? values.summary.trim()
+        : "";
+
+    const content =
+      typeof values.content === "string"
+        ? values.content.trim()
+        : "";
+
+    const category = values.category;
+    const status = values.status;
+
+    if (
+      !title ||
+      title.length > 200 ||
+      summary.length > 500 ||
+      !content ||
+      typeof category !== "string" ||
+      !allowedCategories.includes(category) ||
+      (status !== "draft" && status !== "published")
+    ) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð´ÑƒÑ‚ÑƒÑƒ ÑÑÐ²ÑÐ» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 4. Ó¨Ð¼Ð½Ó©Ñ… Ñ‚Ó©Ð»Ó©Ð²Ð¸Ð¹Ð³ ÑƒÐ½ÑˆÐ¸Ñ…
+    const { data: existing, error: readError } =
+      await supabase
+        .from("company_news")
+        .select("id,status,published_at")
+        .eq("id", id)
+        .maybeSingle();
+
+    if (readError) {
+      console.error("Read company news:", readError);
+
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð¼ÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð³ ÑƒÐ½ÑˆÐ¸Ð¶ Ñ‡Ð°Ð´ÑÐ°Ð½Ð³Ò¯Ð¹." },
+        { status: 500 }
+      );
+    }
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹." },
+        { status: 404 }
+      );
+    }
+
+    // ÐÐ¾Ð¾Ñ€Ð³Ð¸Ð¹Ð³ Ð°Ð½Ñ… Ð½Ð¸Ð¹Ñ‚Ð»ÑÑ…ÑÐ´ Ð¾Ð³Ð½Ð¾Ð¾ Ò¯Ò¯ÑÐ³ÑÐ½Ñ.
+    // ÐÐ¸Ð¹Ñ‚Ð»ÑÐ³Ð´ÑÑÐ½ Ð¼ÑÐ´ÑÑÐ³ Ð·Ð°ÑÐ°Ñ…Ð°Ð´ Ó©Ð¼Ð½Ó©Ñ… Ð¾Ð³Ð½Ð¾Ð¾Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð½Ð°.
+    const publishedAt =
+      status === "published"
+        ? existing.published_at ?? new Date().toISOString()
+        : null;
+
+    // 5. ÐœÑÐ´ÑÑÐ³ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…
+    const { error: updateError } = await supabase
+      .from("company_news")
+      .update({
+        title,
+        summary: summary || null,
+        content,
+        category,
+        status,
+        published_at: publishedAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      console.error("Update company news:", updateError);
+
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑ Ð·Ð°ÑÐ°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "ÐœÑÐ´ÑÑ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÐ³Ð´Ð»ÑÑ.",
+    });
+  } catch (error) {
+    console.error("Patch company news:", error);
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const imageExtensions: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export async function POST(
+  request: Request,
+  context: RouteContext
+) {
+  try {
+    const { id } = await context.params;
+
+    if (!uuidPattern.test(id)) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ ID Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // ÐÑÐ²Ñ‚Ñ€ÑÐ»Ñ‚ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError || isAdmin !== true) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // ÐœÑÐ´ÑÑ Ð±Ð°Ð¹Ð³Ð°Ð° ÑÑÑÑ…Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const { data: existing, error: readError } =
+      await supabase
+        .from("company_news")
+        .select("id,image_url")
+        .eq("id", id)
+        .maybeSingle();
+
+    if (readError || !existing) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹." },
+        { status: 404 }
+      );
+    }
+
+    const form = await request.formData();
+    const image = form.get("image");
+
+    if (!(image instanceof File) || image.size === 0) {
+      return NextResponse.json(
+        { error: "Ð—ÑƒÑ€Ð°Ð³ ÑÐ¾Ð½Ð³Ð¾Ð½Ð¾ ÑƒÑƒ." },
+        { status: 400 }
+      );
+    }
+
+    const extension = imageExtensions[image.type];
+
+    if (!extension || image.size > MAX_IMAGE_SIZE) {
+      return NextResponse.json(
+        {
+          error:
+            "Ð—Ó©Ð²Ñ…Ó©Ð½ JPG, PNG, WebP Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ‚Ð°Ð¹, 5 MB Ñ…Ò¯Ñ€Ñ‚ÑÐ»Ñ… Ð·ÑƒÑ€Ð°Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð°.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Ð”Ð°Ð²Ñ‚Ð°Ð³Ð´Ð°Ñ…Ð³Ò¯Ð¹ Ð½ÑÑ€ÑÑÑ€ ÑˆÐ¸Ð½Ñ Ð·ÑƒÑ€Ð°Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const imagePath =
+      `${id}/${crypto.randomUUID()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("company-news")
+      .upload(imagePath, image, {
+        contentType: image.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Update news image upload:", uploadError);
+
+      return NextResponse.json(
+        { error: "Ð¨Ð¸Ð½Ñ Ð·ÑƒÑ€Ð°Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("company-news")
+      .getPublicUrl(imagePath);
+
+    const newImageUrl = urlData.publicUrl;
+
+    // ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð·ÑƒÑ€Ð³Ð¸Ð¹Ð½ URL ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…
+    const { error: updateError } = await supabase
+      .from("company_news")
+      .update({
+        image_url: newImageUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      // DB ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÐ»Ñ‚ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹ Ð±Ð¾Ð» ÑˆÐ¸Ð½Ñ Ð·ÑƒÑ€Ð³Ð¸Ð¹Ð³ Ñ†ÑÐ²ÑÑ€Ð»ÑÑ…
+      await supabase.storage
+        .from("company-news")
+        .remove([imagePath]);
+
+      console.error("Update news image DB:", updateError);
+
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð·ÑƒÑ€Ð°Ð³ ÑˆÐ¸Ð½ÑÑ‡Ð»ÑÑ…ÑÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    // Ó¨Ð¼Ð½Ó©Ñ… Ð·ÑƒÑ€Ð°Ð³ Ð¼Ð°Ð½Ð°Ð¹ bucket-Ð´ Ð±Ð°Ð¹Ð²Ð°Ð» Ñ†ÑÐ²ÑÑ€Ð»ÑÑ…
+    if (existing.image_url) {
+      const marker = "/storage/v1/object/public/company-news/";
+      const markerIndex = existing.image_url.indexOf(marker);
+
+      if (markerIndex !== -1) {
+        const oldPath = existing.image_url
+          .slice(markerIndex + marker.length)
+          .split("?")[0];
+
+        if (oldPath.startsWith(`${id}/`)) {
+          const { error: removeError } =
+            await supabase.storage
+              .from("company-news")
+              .remove([decodeURIComponent(oldPath)]);
+
+          if (removeError) {
+            console.error("Remove old news image:", removeError);
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      image_url: newImageUrl,
+      message: "ÐœÑÐ´ÑÑÐ½Ð¸Ð¹ Ð·ÑƒÑ€Ð°Ð³ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ ÑÐ¾Ð»Ð¸Ð³Ð´Ð»Ð¾Ð¾.",
+    });
+  } catch (error) {
+    console.error("Replace company news image:", error);
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\settings\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const allowedFields = [
+  "company_name",
+  "company_description",
+  "phone",
+  "email",
+  "address",
+  "facebook_url",
+  "instagram_url",
+  "hero_title",
+  "hero_description",
+  "hero_section_label",
+  "hero_badge_text",
+  "hero_card_label",
+  "hero_card_title",
+  "hero_card_description",
+  "primary_color",
+  "secondary_color",
+] as const;
+
+type SettingField = (typeof allowedFields)[number];
+
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+
+    // 1. ÐÑÐ²Ñ‚ÑÑ€ÑÑÐ½ Ñ…ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError || isAdmin !== true) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Request body ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const body: unknown = await request.json();
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return NextResponse.json(
+        { error: "ÐœÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    const input = body as Record<string, unknown>;
+
+    const updates: Partial<
+      Record<SettingField, string>
+    > = {};
+
+    // 4. Ð—Ó©Ð²ÑˆÓ©Ó©Ñ€Ó©Ð³Ð´ÑÓ©Ð½ Ñ‚Ð°Ð»Ð±Ð°Ñ€ÑƒÑƒÐ´Ñ‹Ð³ Ð°Ð²Ð°Ñ…
+    for (const field of allowedFields) {
+      if (!(field in input)) continue;
+
+      const value = input[field];
+
+      if (typeof value !== "string") {
+        return NextResponse.json(
+          {
+            error: `${field} Ñ‚Ð°Ð»Ð±Ð°Ñ€ Ñ‚ÐµÐºÑÑ‚ Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      updates[field] = value.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: "Ð¨Ð¸Ð½ÑÑ‡Ð»ÑÑ… Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð±Ð°Ð¹Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 5. Ð‘Ð°Ð¹Ð³ÑƒÑƒÐ»Ð»Ð°Ð³Ñ‹Ð½ Ð½ÑÑ€ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    if (
+      "company_name" in updates &&
+      !updates.company_name
+    ) {
+      return NextResponse.json(
+        {
+          error: "Ð‘Ð°Ð¹Ð³ÑƒÑƒÐ»Ð»Ð°Ð³Ñ‹Ð½ Ð½ÑÑ€ Ñ…Ð¾Ð¾ÑÐ¾Ð½ Ð±Ð°Ð¹Ð¶ Ð±Ð¾Ð»Ð¾Ñ…Ð³Ò¯Ð¹.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 6. Ó¨Ð½Ð³Ó©Ð½Ð¸Ð¹ ÐºÐ¾Ð´ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    for (const field of [
+      "primary_color",
+      "secondary_color",
+    ] as const) {
+      const color = updates[field];
+
+      if (
+        color !== undefined &&
+        !/^#[0-9A-Fa-f]{6}$/.test(color)
+      ) {
+        return NextResponse.json(
+          {
+            error: `${field} Ó©Ð½Ð³Ó©Ð½Ð¸Ð¹ ÐºÐ¾Ð´ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 7. Social media Ñ…Ð¾Ð»Ð±Ð¾Ð¾Ñ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    for (const field of [
+      "facebook_url",
+      "instagram_url",
+    ] as const) {
+      const value = updates[field];
+
+      if (value) {
+        try {
+          const url = new URL(value);
+
+          if (
+            !["https:", "http:"].includes(url.protocol)
+          ) {
+            throw new Error("Invalid protocol");
+          }
+        } catch {
+          return NextResponse.json(
+            {
+              error: `${field} Ñ…Ð¾Ð»Ð±Ð¾Ð¾Ñ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // 8. Supabase-Ð´ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const { data, error } = await supabase
+      .from("site_settings")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", 1)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error(
+        "Settings update error:",
+        error.message
+      );
+
+      return NextResponse.json(
+        {
+          error: "Ð¢Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      settings: data,
+    });
+  } catch (error) {
+    console.error("Settings API error:", error);
+
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\settings\hero-image\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+
+    // 1. ÐÑÐ²Ñ‚ÑÑ€ÑÑÐ½ Ñ…ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const { data: isAdmin, error: adminError } =
+      await supabase.rpc("is_admin");
+
+    if (adminError || !isAdmin) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Ð—ÑƒÑ€Ð°Ð³ Ð°Ð²Ð°Ñ…
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: "Hero Ð·ÑƒÑ€Ð°Ð³ ÑÐ¾Ð½Ð³Ð¾Ð½Ð¾ ÑƒÑƒ." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_TYPES[file.type]) {
+      return NextResponse.json(
+        {
+          error: "Ð—Ó©Ð²Ñ…Ó©Ð½ PNG, JPG, WebP Ð·ÑƒÑ€Ð°Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð°.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          error: "Ð—ÑƒÑ€Ð³Ð¸Ð¹Ð½ Ñ…ÑÐ¼Ð¶ÑÑ 5 MB-Ð°Ð°Ñ Ð¸Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 4. Storage-Ð´ Hero Ð·ÑƒÑ€Ð°Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const extension = ALLOWED_TYPES[file.type];
+
+    const filePath = `hero/${crypto.randomUUID()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("site-assets")
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return NextResponse.json(
+        { error: uploadError.message },
+        { status: 500 }
+      );
+    }
+
+    // 5. Public URL Ð°Ð²Ð°Ñ…
+    const { data: urlData } = supabase.storage
+      .from("site-assets")
+      .getPublicUrl(filePath);
+
+    // 6. site_settings Ñ…Ò¯ÑÐ½ÑÐ³Ñ‚ÑÐ´ URL Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const { data: settings, error: updateError } =
+      await supabase
+        .from("site_settings")
+        .update({
+          hero_image_url: urlData.publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1)
+        .select("hero_image_url")
+        .single();
+
+    if (updateError) {
+      // Database update Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹ Ð±Ð¾Ð»
+      // ÑˆÐ¸Ð½ÑÑÑ€ upload Ñ…Ð¸Ð¹ÑÑÐ½ Ñ„Ð°Ð¹Ð»Ñ‹Ð³ ÑƒÑÑ‚Ð³Ð°Ñ…
+      await supabase.storage
+        .from("site-assets")
+        .remove([filePath]);
+
+      return NextResponse.json(
+        { error: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      hero_image_url: settings.hero_image_url,
+    });
+  } catch (error) {
+    console.error("Hero image upload error:", error);
+
+    return NextResponse.json(
+      { error: "Hero Ð·ÑƒÑ€Ð°Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\settings\logo\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+
+    // 1. ÐÑÐ²Ñ‚ÑÑ€ÑÑÐ½ ÑÑÑÑ…
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const { data: isAdmin, error: adminError } =
+      await supabase.rpc("is_admin");
+
+    if (adminError || !isAdmin) {
+      return NextResponse.json(
+        { error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Ð¤Ð°Ð¹Ð» Ð°Ð²Ð°Ñ…
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: "Ð›Ð¾Ð³Ð¾ Ð·ÑƒÑ€Ð°Ð³ ÑÐ¾Ð½Ð³Ð¾Ð½Ð¾ ÑƒÑƒ." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_TYPES[file.type]) {
+      return NextResponse.json(
+        { error: "Ð—Ó©Ð²Ñ…Ó©Ð½ PNG, JPG, WebP Ð·ÑƒÑ€Ð°Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Ð—ÑƒÑ€Ð³Ð¸Ð¹Ð½ Ñ…ÑÐ¼Ð¶ÑÑ 5 MB-Ð°Ð°Ñ Ð¸Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°." },
+        { status: 400 }
+      );
+    }
+
+    // 4. Storage-Ð´ ÑˆÐ¸Ð½Ñ Ð»Ð¾Ð³Ð¾ Ð¾Ñ€ÑƒÑƒÐ»Ð°Ñ…
+    const extension = ALLOWED_TYPES[file.type];
+    const filePath = `logos/${crypto.randomUUID()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("site-assets")
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return NextResponse.json(
+        { error: uploadError.message },
+        { status: 500 }
+      );
+    }
+
+    // 5. Public URL Ð°Ð²Ð°Ñ…
+    const { data: urlData } = supabase.storage
+      .from("site-assets")
+      .getPublicUrl(filePath);
+
+    // 6. Settings Ñ…Ò¯ÑÐ½ÑÐ³Ñ‚ÑÐ´ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ…
+    const { data: settings, error: updateError } =
+      await supabase
+        .from("site_settings")
+        .update({
+          logo_url: urlData.publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1)
+        .select("logo_url")
+        .single();
+
+    if (updateError) {
+      // Ð¥Ð°Ð´Ð³Ð°Ð»Ð°Ð»Ñ‚ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹ Ð±Ð¾Ð» ÑˆÐ¸Ð½Ñ Ñ„Ð°Ð¹Ð»Ñ‹Ð³ Ñ†ÑÐ²ÑÑ€Ð»ÑÑ…
+      await supabase.storage
+        .from("site-assets")
+        .remove([filePath]);
+
+      return NextResponse.json(
+        { error: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      logo_url: settings.logo_url,
+    });
+  } catch (error) {
+    console.error("Logo upload error:", error);
+
+    return NextResponse.json(
+      { error: "Ð›Ð¾Ð³Ð¾ Ð¾Ñ€ÑƒÑƒÐ»Ð°Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\admin\sync-mongolbank\route.ts ==========
+
+import { NextResponse } from "next/server";
+
+import { createClient } from "@/lib/supabase/server";
+import { syncMongolbankNews } from "@/lib/mongolbank-sync";
+import { withMongolbankSyncLock } from "@/lib/security/sync-lock";
+
+export async function POST() {
+  try {
+    // 1. Ð¥ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡ Ð½ÑÐ²Ñ‚ÑÑ€ÑÑÐ½ ÑÑÑÑ…Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        {
+          error: "ÐÑÐ²Ñ‚Ñ€ÑÑ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹.",
+        },
+        { status: 401 }
+      );
+    }
+
+    // 2. ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ…Ñ‚ÑÐ¹ ÑÑÑÑ…Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ…
+    const {
+      data: isAdmin,
+      error: adminError,
+    } = await supabase.rpc("is_admin");
+
+    if (adminError || isAdmin !== true) {
+      return NextResponse.json(
+        {
+          error: "ÐÐ´Ð¼Ð¸Ð½ ÑÑ€Ñ… ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // 3. ÐœÐ¾Ð½Ð³Ð¾Ð»Ð±Ð°Ð½ÐºÐ½Ñ‹ Ð¼ÑÐ´ÑÑÐ³ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ…
+    const result = await withMongolbankSyncLock(
+      () => syncMongolbankNews()
+    );
+
+    if (result === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ÐœÐ¾Ð½Ð³Ð¾Ð»Ð±Ð°Ð½ÐºÐ½Ñ‹ Ð¼ÑÐ´ÑÑ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ… Ð°Ð¶Ð¸Ð»Ð»Ð°Ð³Ð°Ð° Ð°Ð»ÑŒ Ñ…ÑÐ´Ð¸Ð¹Ð½ ÑÐ²Ð°Ð³Ð´Ð°Ð¶ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        {
+          status: 409,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": "60",
+          },
+        }
+      );
+    }
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(
+      "Mongolbank sync error:",
+      error instanceof Error
+        ? error.message
+        : error
+    );
+
+    return NextResponse.json(
+      {
+        error: "ÐœÑÐ´ÑÑ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ…ÑÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\applications\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { checkDatabaseRateLimit } from "@/lib/security/rate-limit";
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_DOCUMENTS = 10;
+
+const FILE_EXTENSIONS: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
+
+type UploadedDocument = {
+  documentName: string;
+  file: File;
+};
+
+type TurnstileResult = {
+  success: boolean;
+  hostname?: string;
+  action?: string;
+  "error-codes"?: string[];
+};
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    {
+      status,
+      headers: { "Cache-Control": "no-store" },
+    }
+  );
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/[\s()-]/g, "");
+}
+
+function normalizeRegisterNumber(value: string) {
+  return value.replace(/\s/g, "").toUpperCase();
+}
+
+
+function getClientIp(request: Request) {
+  // Local development:
+  // IP Ð½ÑŒ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶Ð°Ð°Ð³Ò¯Ð¹ Ñ‚ÑƒÐ» rate limit-Ð¸Ð¹Ð³
+  // Ð±Ò¯Ñ… Ñ…ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡Ð¸Ð´ Ñ…ÑƒÐ²Ð°Ð°Ð»Ñ†Ð°Ñ…Ð³Ò¯Ð¹.
+  if (process.env.NODE_ENV === "development") {
+    return null;
+  }
+
+  // Production:
+  // Ð—Ó©Ð²Ñ…Ó©Ð½ Ð¸Ñ‚Ð³ÑÐ¼Ð¶Ð»ÑÐ³Ð´ÑÑÐ½ proxy Ð°ÑˆÐ¸Ð³Ð»Ð°Ð¶ Ð±Ð°Ð¹Ð³Ð°Ð°
+  // Ò¯ÐµÐ´ IP header-Ð¸Ð¹Ð³ ÑƒÐ½ÑˆÐ¸Ð½Ð°.
+  if (process.env.TRUST_PROXY_IP_HEADERS !== "true") {
+    return null;
+  }
+
+  const realIp = request.headers.get("x-real-ip");
+  const forwarded = request.headers.get("x-forwarded-for");
+
+  return (
+    realIp?.trim() ||
+    forwarded?.split(",")[0]?.trim() ||
+    null
+  );
+}
+
+async function isValidFileContent(file: File) {
+  // Ð¥ÑÐ¼Ð¶ÑÑÐ³ ÑÑ…ÑÐ»Ð¶ ÑˆÐ°Ð»Ð³Ð°ÑÐ°Ð½ Ñ‚ÑƒÐ» ÑÐ½Ð´
+  // Ð·Ó©Ð²Ñ…Ó©Ð½ signature-Ð¸Ð¹Ð½ Ð±Ð°Ð¹Ñ‚ÑƒÑƒÐ´Ñ‹Ð³ ÑƒÐ½ÑˆÐ¸Ð½Ð°.
+  const bytes = new Uint8Array(
+    await file.slice(0, 8).arrayBuffer()
+  );
+
+  if (file.type === "application/pdf") {
+    return (
+      bytes[0] === 0x25 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x44 &&
+      bytes[3] === 0x46
+    );
+  }
+
+  if (file.type === "image/jpeg") {
+    return (
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff
+    );
+  }
+
+  if (file.type === "image/png") {
+    const signature = [
+      0x89, 0x50, 0x4e, 0x47,
+      0x0d, 0x0a, 0x1a, 0x0a,
+    ];
+
+    return signature.every(
+      (value, index) => bytes[index] === value
+    );
+  }
+
+  return false;
+}
+
+async function verifyTurnstile(
+  token: string,
+  ip: string
+) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+
+  if (!secret) {
+    throw new Error("TURNSTILE_SECRET_KEY is missing");
+  }
+
+  const body = new URLSearchParams({
+    secret,
+    response: token,
+  });
+
+  if (
+    ip !== "unknown" &&
+    ip !== "unverified-client"
+  ) {
+    body.set("remoteip", ip);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    10000
+  );
+
+  try {
+    const response = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body,
+        cache: "no-store",
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Turnstile service unavailable");
+    }
+
+    const result =
+      (await response.json()) as TurnstileResult;
+
+    if (!result.success) {
+      return false;
+    }
+
+    // Production-Ð´ TURNSTILE_EXPECTED_HOSTNAME
+    // Ñ‚Ð¾Ñ…Ð¸Ñ€ÑƒÑƒÐ»Ð±Ð°Ð» hostname-Ð³ Ð´Ð°Ð²Ñ…Ð°Ñ€ ÑˆÐ°Ð»Ð³Ð°Ð½Ð°.
+    const expectedHostname =
+      process.env.TURNSTILE_EXPECTED_HOSTNAME;
+
+    if (
+      expectedHostname &&
+      result.hostname !== expectedHostname
+    ) {
+      return false;
+    }
+
+    return true;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function POST(request: Request) {
+  
+  const ip = getClientIp(request);
+
+  try {
+    const contentType =
+      request.headers.get("content-type") ?? "";
+
+    if (
+      !contentType.toLowerCase().startsWith(
+        "multipart/form-data"
+      )
+    ) {
+      return jsonError(
+        "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        415
+      );
+    }
+
+    const contentLength = Number(
+      request.headers.get("content-length")
+    );
+
+    if (
+      contentLength > 0 &&
+      contentLength > 60 * 1024 * 1024
+    ) {
+      return jsonError(
+        "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð½ Ð½Ð¸Ð¹Ñ‚ Ñ…ÑÐ¼Ð¶ÑÑ Ñ…ÑÑ‚ÑÑ€ÑÑÐ½ Ð±Ð°Ð¹Ð½Ð°.",
+        413
+      );
+    }
+
+    const formData = await request.formData();
+
+    // TURNSTILE
+    const turnstileToken = String(
+      formData.get("turnstileToken") ?? ""
+    ).trim();
+
+    if (
+      !turnstileToken ||
+      turnstileToken.length > 4096
+    ) {
+      return jsonError(
+        "CAPTCHA Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ð»Ñ‚ ÑˆÐ°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹.",
+        400
+      );
+    }
+
+    let verified = false;
+
+    try {
+      verified = await verifyTurnstile(
+        turnstileToken,
+        ip ?? "unknown"
+      );
+    } catch (error) {
+      console.error("Turnstile service error:", error);
+
+      return jsonError(
+        "CAPTCHA Ò¯Ð¹Ð»Ñ‡Ð¸Ð»Ð³ÑÑ Ñ‚Ò¯Ñ€ Ð°Ð¶Ð¸Ð»Ð»Ð°Ñ…Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°.",
+        503
+      );
+    }
+
+    if (!verified) {
+      return jsonError(
+        "CAPTCHA Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ð»Ñ‚ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹ Ð±Ð¾Ð»Ð»Ð¾Ð¾.",
+        400
+      );
+    }
+
+    // INPUT
+    const lastName = String(
+      formData.get("lastName") ?? ""
+    ).trim();
+
+    const firstName = String(
+      formData.get("firstName") ?? ""
+    ).trim();
+
+    const phone = normalizePhone(
+      String(formData.get("phone") ?? "")
+    );
+
+    const registerNumber = normalizeRegisterNumber(
+      String(formData.get("registerNumber") ?? "")
+    );
+
+    const loanType = String(
+      formData.get("loanType") ?? ""
+    ).trim();
+
+    const amountRaw = formData.get("amount");
+    const termRaw = formData.get("term");
+
+    const amount = Number(amountRaw);
+    const term = Number(termRaw);
+
+    const incomeRaw = formData.get("monthlyIncome");
+
+    const monthlyIncome =
+      incomeRaw !== null &&
+      String(incomeRaw).trim() !== ""
+        ? Number(incomeRaw)
+        : null;
+
+    const note = String(
+      formData.get("note") ?? ""
+    ).trim();
+
+    // BASIC VALIDATION
+    if (
+      !lastName ||
+      !firstName ||
+      !loanType ||
+      amountRaw === null ||
+      termRaw === null ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      !Number.isInteger(term) ||
+      term <= 0
+    ) {
+      return jsonError(
+        "ÐžÑ€ÑƒÑƒÐ»ÑÐ°Ð½ Ð¼ÑÐ´ÑÑÐ»ÑÐ» Ð´ÑƒÑ‚ÑƒÑƒ ÑÑÐ²ÑÐ» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        400
+      );
+    }
+
+    if (
+      lastName.length > 100 ||
+      firstName.length > 100 ||
+      loanType.length > 100 ||
+      note.length > 2000
+    ) {
+      return jsonError(
+        "ÐžÑ€ÑƒÑƒÐ»ÑÐ°Ð½ Ñ‚ÐµÐºÑÑ‚Ð¸Ð¹Ð½ ÑƒÑ€Ñ‚ Ñ…ÑÑ‚ÑÑ€ÑÑÐ½ Ð±Ð°Ð¹Ð½Ð°.",
+        400
+      );
+    }
+
+    if (!/^\d{8}$/.test(phone)) {
+      return jsonError(
+        "Ð£Ñ‚Ð°ÑÐ½Ñ‹ Ð´ÑƒÐ³Ð°Ð°Ñ€ 8 Ð¾Ñ€Ð¾Ð½Ñ‚Ð¾Ð¹ Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.",
+        400
+      );
+    }
+
+    if (!/^[Ð-Ð¯Ó¨Ò®Ð]{2}\d{8}$/.test(registerNumber)) {
+      return jsonError(
+        "Ð ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¸Ð¹Ð½ Ð´ÑƒÐ³Ð°Ð°Ñ€ 2 ÐºÐ¸Ñ€Ð¸Ð»Ð» Ò¯ÑÑÐ³, 8 Ñ†Ð¸Ñ„Ñ€Ñ‚ÑÐ¹ Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.",
+        400
+      );
+    }
+
+    if (
+      monthlyIncome !== null &&
+      (!Number.isFinite(monthlyIncome) ||
+        monthlyIncome < 0)
+    ) {
+      return jsonError(
+        "Ð¡Ð°Ñ€Ñ‹Ð½ Ð¾Ñ€Ð»Ð¾Ð³Ñ‹Ð½ Ñ…ÑÐ¼Ð¶ÑÑ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+        400
+      );
+    }
+    
+    // DATABASE RATE LIMIT
+    // CAPTCHA Ð±Ð¾Ð»Ð¾Ð½ Ð¼ÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ ÑˆÐ°Ð»Ð³Ð°Ð³Ð´ÑÐ°Ð½Ñ‹ Ð´Ð°Ñ€Ð°Ð° Ð°Ð¶Ð¸Ð»Ð»Ð°Ð½Ð°.
+    // Ð ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¸Ð¹Ð½ Ð´ÑƒÐ³Ð°Ð°Ñ€ Ð½ÑŒ Ñ…ÑÑ€ÑÐ³Ð»ÑÐ³Ñ‡Ð¸Ð¹Ð½ Ð¾Ñ€ÑƒÑƒÐ»ÑÐ°Ð½ ÑƒÑ‚Ð³Ð°
+    // Ñ‚ÑƒÐ» IP rate limit-Ð¸Ð¹Ð³ Ð¾Ñ€Ð»Ð¾Ñ…Ð³Ò¯Ð¹.
+
+    let databaseRateLimit;
+
+    try {
+      databaseRateLimit = await checkDatabaseRateLimit(
+        `register:${registerNumber}`,
+        5,
+        60
+      );
+    } catch (error) {
+      console.error(
+        "Application rate limit error:",
+        error
+      );
+
+      return jsonError(
+        "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð³ Ñ‚Ò¯Ñ€ ÑˆÐ°Ð»Ð³Ð°Ñ… Ð±Ð¾Ð»Ð¾Ð¼Ð¶Ð³Ò¯Ð¹ Ð±Ð°Ð¹Ð½Ð°. Ð”Ð°Ñ€Ð°Ð° Ð´Ð°Ñ…Ð¸Ð½ Ð¾Ñ€Ð¾Ð»Ð´Ð¾Ð½Ð¾ ÑƒÑƒ.",
+        503
+      );
+    }
+
+    if (!databaseRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "Ð¥ÑÑ‚ Ð¾Ð»Ð¾Ð½ Ñ…Ò¯ÑÑÐ»Ñ‚ Ð¸Ð»Ð³ÑÑÑÑÐ½ Ð±Ð°Ð¹Ð½Ð°. Ð¢Ò¯Ñ€ Ñ…Ò¯Ð»ÑÑÐ³ÑÑÐ´ Ð´Ð°Ñ…Ð¸Ð½ Ð¾Ñ€Ð¾Ð»Ð´Ð¾Ð½Ð¾ ÑƒÑƒ.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              databaseRateLimit.retryAfter
+            ),
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
+
+    const supabase = createAdminClient();
+
+    // LOAN PRODUCT
+    const {
+      data: loanProduct,
+      error: loanError,
+    } = await supabase
+      .from("loan_products")
+      .select(
+        "id, slug, documents, is_active, max_amount, max_term"
+      )
+      .eq("slug", loanType)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (loanError) {
+      console.error("Loan lookup error:", loanError);
+      return jsonError(
+        "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ð¼ÑÐ´ÑÑÐ»Ð»Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ð¶ Ñ‡Ð°Ð´ÑÐ°Ð½Ð³Ò¯Ð¹.",
+        500
+      );
+    }
+
+    if (!loanProduct) {
+      return jsonError(
+        "Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ð±Ò¯Ñ‚ÑÑÐ³Ð´ÑÑ…Ò¯Ò¯Ð½ Ð¾Ð»Ð´ÑÐ¾Ð½Ð³Ò¯Ð¹.",
+        400
+      );
+    }
+
+    if (
+      loanProduct.max_amount !== null &&
+      amount > Number(loanProduct.max_amount)
+    ) {
+      return jsonError(
+        `Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ…ÑÐ¼Ð¶ÑÑ ${Number(
+          loanProduct.max_amount
+        ).toLocaleString("en-US")}â‚®-Ó©Ó©Ñ Ð¸Ñ… Ð±Ð°Ð¹Ð¶ Ð±Ð¾Ð»Ð¾Ñ…Ð³Ò¯Ð¹.`,
+        400
+      );
+    }
+
+    if (
+      loanProduct.max_term !== null &&
+      term > Number(loanProduct.max_term)
+    ) {
+      return jsonError(
+        `Ð—ÑÑÐ»Ð¸Ð¹Ð½ Ñ…ÑƒÐ³Ð°Ñ†Ð°Ð° ${loanProduct.max_term} ÑÐ°Ñ€Ð°Ð°Ñ Ð¸Ñ… Ð±Ð°Ð¹Ð¶ Ð±Ð¾Ð»Ð¾Ñ…Ð³Ò¯Ð¹.`,
+        400
+      );
+    }
+
+    // DUPLICATE CHECK
+    const duplicateSince = new Date(
+      Date.now() - 5 * 60 * 1000
+    ).toISOString();
+
+    const {
+      data: existingApplication,
+      error: duplicateError,
+    } = await supabase
+      .from("loan_applications")
+      .select("id")
+      .eq("register_number", registerNumber)
+      .eq("loan_type", loanType)
+      .gte("created_at", duplicateSince)
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateError) {
+      console.error(
+        "Duplicate check error:",
+        duplicateError
+      );
+
+      return jsonError(
+        "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð³ ÑˆÐ°Ð»Ð³Ð°Ñ… Ò¯ÐµÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        500
+      );
+    }
+
+    if (existingApplication) {
+      return jsonError(
+        "Ð˜Ð¶Ð¸Ð» Ð·ÑÑÐ»Ð¸Ð¹Ð½ Ñ…Ò¯ÑÑÐ»Ñ‚ ÑÐ°ÑÑ…Ð°Ð½ Ð¸Ð»Ð³ÑÑÐ³Ð´ÑÑÐ½ Ð±Ð°Ð¹Ð½Ð°. 5 Ð¼Ð¸Ð½ÑƒÑ‚Ñ‹Ð½ Ð´Ð°Ñ€Ð°Ð° Ð´Ð°Ñ…Ð¸Ð½ Ð¾Ñ€Ð¾Ð»Ð´Ð¾Ð½Ð¾ ÑƒÑƒ.",
+        429
+      );
+    }
+
+    // REQUIRED DOCUMENTS
+    const requiredDocuments: string[] =
+      Array.isArray(loanProduct.documents)
+        ? loanProduct.documents
+        : [];
+
+    if (requiredDocuments.length > MAX_DOCUMENTS) {
+      return jsonError(
+        "Ð¨Ð°Ð°Ñ€Ð´Ð»Ð°Ð³Ð°Ñ‚Ð°Ð¹ Ð±Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð½ Ñ‚Ð¾Ð¾ Ñ…ÑÑ‚ÑÑ€ÑÑÐ½ Ð±Ð°Ð¹Ð½Ð°.",
+        400
+      );
+    }
+
+    const files: UploadedDocument[] = [];
+    let totalFileSize = 0;
+
+    for (
+      let index = 0;
+      index < requiredDocuments.length;
+      index++
+    ) {
+      const documentName = requiredDocuments[index];
+
+      if (typeof documentName !== "string") {
+        return jsonError(
+          "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð½ Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.",
+          500
+        );
+      }
+
+      const file = formData.get(`document-${index}`);
+
+      if (
+        !(file instanceof File) ||
+        file.size === 0
+      ) {
+        return jsonError(
+          `"${documentName}" Ñ„Ð°Ð¹Ð»Ñ‹Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð° ÑƒÑƒ.`,
+          400
+        );
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        return jsonError(
+          `"${documentName}" Ñ„Ð°Ð¹Ð» 10MB-Ð°Ð°Ñ Ð¸Ñ… Ð±Ð°Ð¹Ð½Ð°.`,
+          400
+        );
+      }
+
+      totalFileSize += file.size;
+
+      if (totalFileSize > MAX_TOTAL_FILE_SIZE) {
+        return jsonError(
+          "Ð¤Ð°Ð¹Ð»ÑƒÑƒÐ´Ñ‹Ð½ Ð½Ð¸Ð¹Ñ‚ Ñ…ÑÐ¼Ð¶ÑÑ 50MB-Ð°Ð°Ñ Ð¸Ñ… Ð±Ð°Ð¹Ð½Ð°.",
+          413
+        );
+      }
+
+      if (!FILE_EXTENSIONS[file.type]) {
+        return jsonError(
+          `"${documentName}" Ñ„Ð°Ð¹Ð» PDF, JPG ÑÑÐ²ÑÐ» PNG Ð±Ð°Ð¹Ñ… Ñ‘ÑÑ‚Ð¾Ð¹.`,
+          400
+        );
+      }
+
+      if (!(await isValidFileContent(file))) {
+        return jsonError(
+          `"${documentName}" Ñ„Ð°Ð¹Ð»Ñ‹Ð½ Ð±Ð¾Ð´Ð¸Ñ‚ Ñ‚Ó©Ñ€Ó©Ð» Ð±ÑƒÑ€ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°.`,
+          400
+        );
+      }
+
+      files.push({ documentName, file });
+    }
+
+    // CREATE APPLICATION
+    const {
+      data: application,
+      error: applicationError,
+    } = await supabase
+      .from("loan_applications")
+      .insert({
+        last_name: lastName,
+        first_name: firstName,
+        phone,
+        register_number: registerNumber,
+        loan_type: loanType,
+        amount,
+        term,
+        monthly_income: monthlyIncome,
+        note: note || null,
+      })
+      .select("id")
+      .single();
+
+    if (applicationError || !application) {
+      console.error(
+        "Application insert error:",
+        applicationError
+      );
+
+      return jsonError(
+        "Ð¥Ò¯ÑÑÐ»Ñ‚Ð¸Ð¹Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð¶ Ñ‡Ð°Ð´ÑÐ°Ð½Ð³Ò¯Ð¹.",
+        500
+      );
+    }
+
+    const applicationId = application.id;
+    const uploadedPaths: string[] = [];
+
+    async function rollbackApplication() {
+      if (uploadedPaths.length > 0) {
+        const { error } = await supabase.storage
+          .from("loan-documents")
+          .remove(uploadedPaths);
+
+        if (error) {
+          console.error("Storage cleanup error:", error);
+        }
+      }
+
+      const { error } = await supabase
+        .from("loan_applications")
+        .delete()
+        .eq("id", applicationId);
+
+      if (error) {
+        console.error("Application cleanup error:", error);
+      }
+    }
+
+    // UPLOAD DOCUMENTS
+    try {
+      for (const { documentName, file } of files) {
+        const extension = FILE_EXTENSIONS[file.type];
+
+        const filePath =
+          `${application.id}/${crypto.randomUUID()}.${extension}`;
+
+        const { error: uploadError } =
+          await supabase.storage
+            .from("loan-documents")
+            .upload(filePath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        uploadedPaths.push(filePath);
+
+        const { error: documentError } =
+          await supabase
+            .from("application_documents")
+            .insert({
+              application_id: application.id,
+              document_name: documentName,
+              file_path: filePath,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+            });
+
+        if (documentError) {
+          throw documentError;
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Document processing error:",
+        error
+      );
+
+      await rollbackApplication();
+
+      return jsonError(
+        "Ð‘Ð°Ñ€Ð¸Ð¼Ñ‚ Ð±Ð¸Ñ‡Ð³Ð¸Ð¹Ð³ Ñ…Ð°Ð´Ð³Ð°Ð»Ð°Ñ… Ò¯ÐµÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+        500
+      );
+    }
+
+    // SUCCESS
+    return NextResponse.json(
+      {
+        success: true,
+        applicationId: application.id,
+      },
+      {
+        status: 201,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Application API error:", error);
+
+    return jsonError(
+      "Ð¡ÐµÑ€Ð²ÐµÑ€ Ð´ÑÑÑ€ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+      500
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\calculator-settings\route.ts ==========
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET() {
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("loan_calculator_settings")
+      .select(
+        "id,loan_name,monthly_interest_rate,max_dti_ratio,min_term_months,max_term_months,max_loan_amount,is_active"
+      )
+      .eq("is_active", true)
+      .order("loan_name");
+
+    if (error) {
+      return NextResponse.json(
+        { error: "Ð¢Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ ÑƒÐ½ÑˆÐ¸Ñ…Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ settings: data ?? [] });
+  } catch {
+    return NextResponse.json(
+      { error: "Ð¡ÐµÑ€Ð²ÐµÑ€Ð¸Ð¹Ð½ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°." },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\cron\sync-mongolbank\route.ts ==========
+
+import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+
+import { syncMongolbankNews } from "@/lib/mongolbank-sync";
+import { withMongolbankSyncLock } from "@/lib/security/sync-lock";
+
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+
+  if (!secret || secret.length < 32) {
+    return false;
+  }
+
+  const authorization =
+    request.headers.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return false;
+  }
+
+  const providedSecret =
+    authorization.slice("Bearer ".length);
+
+  const expected = Buffer.from(secret, "utf8");
+  const provided = Buffer.from(
+    providedSecret,
+    "utf8"
+  );
+
+  if (expected.length !== provided.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expected, provided);
+}
+
+export async function GET(request: NextRequest) {
+  // 1. Cron secret Ñ‚Ð¾Ñ…Ð¸Ñ€ÑƒÑƒÐ»Ð°Ð³Ð´ÑÐ°Ð½ ÑÑÑÑ…
+  if (!process.env.CRON_SECRET) {
+    console.error("CRON_SECRET is missing");
+
+    return NextResponse.json(
+      { error: "Cron Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ Ð´ÑƒÑ‚ÑƒÑƒ Ð±Ð°Ð¹Ð½Ð°." },
+      { status: 503 }
+    );
+  }
+
+  // 2. ÐÑƒÑƒÑ† Ñ‚Ò¯Ð»Ñ…Ò¯Ò¯Ñ€ ÑˆÐ°Ð»Ð³Ð°Ñ…
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  // 3. ÐœÐ¾Ð½Ð³Ð¾Ð»Ð±Ð°Ð½ÐºÐ½Ñ‹ Ð¼ÑÐ´ÑÑÐ³ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ…
+  try {
+    const result = await withMongolbankSyncLock(
+      () => syncMongolbankNews()
+    );
+
+    if (result === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ÐœÐ¾Ð½Ð³Ð¾Ð»Ð±Ð°Ð½ÐºÐ½Ñ‹ Ð¼ÑÐ´ÑÑ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ… Ð°Ð¶Ð¸Ð»Ð»Ð°Ð³Ð°Ð° Ð°Ð»ÑŒ Ñ…ÑÐ´Ð¸Ð¹Ð½ ÑÐ²Ð°Ð³Ð´Ð°Ð¶ Ð±Ð°Ð¹Ð½Ð°.",
+        },
+        {
+          status: 409,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": "60",
+          },
+        }
+      );
+    }
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(
+      "Cron Mongolbank sync error:",
+      error instanceof Error
+        ? error.message
+        : error
+    );
+
+    return NextResponse.json(
+      {
+        error: "ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚ Ð¼ÑÐ´ÑÑ ÑÐ¸Ð½Ðº Ñ…Ð¸Ð¹Ñ…ÑÐ´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+========== C:\Users\5640 ultra7\Documents\Khugjih capital web\khugjikh-capital-web\app\api\server-time\route.ts ==========
+
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const year = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Ulaanbaatar",
+      year: "numeric",
+    }).format(new Date())
+  );
+
+  return NextResponse.json(
+    { year },
+    {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    }
+  );
+}
