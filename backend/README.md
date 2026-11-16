@@ -27,3 +27,17 @@ npm run build && npm start
 ```
 
 See the root README for the endpoint list and auth flow.
+
+## Deploying to Vercel
+
+Create a separate Vercel project with **Root Directory = `backend`**. `vercel.json`
+handles the rest: `npm run build` compiles `src/` → `dist/`, `api/index.js`
+exports the Express app as a single function, and every path is rewritten to it.
+
+- Set all variables from `.env.example` in the Vercel project, plus
+  `NODE_ENV=production` and `TRUST_PROXY=true`.
+- `CORS_ORIGINS` must contain the frontend's Vercel/production URL.
+- The news sync cron runs daily at 01:00 UTC (Hobby plan allows daily only).
+  Vercel sends `Authorization: Bearer $CRON_SECRET` automatically.
+- Vercel limits request bodies to **4.5 MB**, so loan applications with larger
+  documents will be rejected there.
