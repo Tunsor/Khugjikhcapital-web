@@ -11,7 +11,9 @@ export const logger = pino({
     ],
     remove: true,
   },
-  ...(isProduction
+  // pino-pretty is a devDependency: never use it in production or on
+  // Vercel (it is not installed there, whatever NODE_ENV says).
+  ...(isProduction || process.env.VERCEL
     ? {}
     : {
         transport: {
