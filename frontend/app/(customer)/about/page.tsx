@@ -4,6 +4,9 @@ import Link from "next/link";
 
 import SiteHeader from "@/components/layout/SiteHeader";
 import SiteFooter from "@/components/layout/SiteFooter";
+import { Fragment } from "react";
+
+import ReelVideo from "@/components/about/ReelVideo";
 import { connection } from "next/server";
 
 const values = [
@@ -60,12 +63,13 @@ export default async function AboutPage() {
           <div className="pointer-events-none absolute -right-40 -top-40 h-[500px] w-[500px] rounded-full border border-white/[0.06]" />
           <div className="pointer-events-none absolute -right-20 -top-20 h-[320px] w-[320px] rounded-full border border-white/[0.06]" />
 
-          <div className="container-main relative py-20 md:py-28 lg:py-32">
+          <div className="container-main relative grid items-center gap-14 py-20 md:py-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16 lg:py-32">
+            <div>
             <SectionEyebrow light>
               Бидний тухай
             </SectionEyebrow>
 
-            <h1 className="mt-8 max-w-[900px] text-[44px] font-semibold leading-[1.06] tracking-[-0.045em] sm:text-[58px] lg:text-[70px]">
+            <h1 className="mt-8 max-w-[900px] text-[44px] font-semibold leading-[1.06] tracking-[-0.045em] sm:text-[58px] lg:text-[56px] xl:text-[70px]">
               Таны амжилт —
               <br />
               <span className="text-[#F4AC38]">
@@ -96,6 +100,17 @@ export default async function AboutPage() {
               >
                 Зээлийн хүсэлт гаргах
               </Link>
+            </div>
+            </div>
+
+            <div className="relative isolate">
+              <ReelVideo
+                src="/videos/khugjikh-capital.mp4"
+                label="Хөгжих Капитал танилцуулга бичлэг"
+                className="aspect-video rounded-[17px] border border-white/15 shadow-[0_24px_60px_#00000040]"
+              />
+
+              <div className="pointer-events-none absolute -bottom-5 -left-5 -z-10 hidden h-32 w-32 rounded-[17px] bg-[#F4AC38]/90 lg:block" />
             </div>
           </div>
         </section>
@@ -209,14 +224,23 @@ export default async function AboutPage() {
               </p>
             </div>
 
-            <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {values.map((value) => (
-                <ValueCard
-                  key={value.number}
-                  number={value.number}
-                  title={value.title}
-                  description={value.description}
-                />
+            <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {values.map((value, index) => (
+                <Fragment key={value.number}>
+                  <ValueCard
+                    number={value.number}
+                    title={value.title}
+                    description={value.description}
+                  />
+
+                  {index === 1 && (
+                    <ReelVideo
+                      src="/videos/reel-1.mp4"
+                      label="Хөгжих Капитал reel бичлэг 1"
+                      className="aspect-[4/5] rounded-[17px] border border-[#E4EAF4] shadow-[0_4px_18px_#00318908] md:row-span-2 md:aspect-auto"
+                    />
+                  )}
+                </Fragment>
               ))}
             </div>
           </div>
@@ -237,7 +261,13 @@ export default async function AboutPage() {
               маргаашийн боломж.
             </h2>
 
-            <div className="mt-14 grid gap-5 lg:grid-cols-2">
+            <div className="mt-14 grid gap-5 md:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
+              <ReelVideo
+                src="/videos/reel-2.mp4"
+                label="Хөгжих Капитал reel бичлэг 2"
+                className="order-last aspect-[4/5] rounded-[17px] border border-white/10 md:col-start-2 md:row-span-2 md:row-start-1 md:aspect-auto xl:col-start-3 xl:row-span-1 xl:min-h-[460px]"
+              />
+
               <div className="rounded-[17px] border border-white/10 bg-white/[0.04] p-8 md:p-10">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#F4AC38]">
                   Эрхэм зорилго
