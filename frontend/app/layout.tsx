@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 
   icons: {
     icon: "/favicon.png",
+    apple: "/apple-icon.png",
   },
 
   applicationName: "Хөгжих Капитал ББСБ",
