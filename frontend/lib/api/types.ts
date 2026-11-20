@@ -60,3 +60,20 @@ export type ExternalNewsItem = {
   source_url: string;
   image_url: string | null;
 };
+
+export type PublicPaymentAccount = {
+  id: string;
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+  iban: string | null;
+  description: string | null;
+  qr_image_url: string | null;
+  sort_order: number;
+};
+
+export type AdminPaymentAccount = PublicPaymentAccount & {
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};

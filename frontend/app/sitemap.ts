@@ -6,7 +6,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   if (!baseUrl) return [];
 
-  const routes = ["", "/about", "/loans"];
+  const routes = ["", "/about", "/loans", "/payment"];
 
   return routes.map((route) => ({
     url: new URL(route, baseUrl).toString(),

@@ -11,6 +11,7 @@ const navigation = [
   { href: "/loans", label: "Зээлийн бүтээгдэхүүн" },
   { href: "/about", label: "Бидний тухай" },
   { href: "/news", label: "Мэдээ" },
+  { href: "/payment", label: "Төлбөр төлөх" },
 ];
 
 type HeaderProps = {

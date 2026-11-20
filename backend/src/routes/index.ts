@@ -22,6 +22,10 @@ import {
   publicNewsRouter,
 } from "../modules/news/news.routes.js";
 import {
+  adminPaymentAccountsRouter,
+  publicPaymentAccountsRouter,
+} from "../modules/payment-accounts/payment-accounts.routes.js";
+import {
   adminSiteSettingsRouter,
   publicSiteSettingsRouter,
 } from "../modules/site-settings/site-settings.routes.js";
@@ -43,6 +47,7 @@ publicRouter.use("/site-settings", publicSiteSettingsRouter);
 publicRouter.use("/loan-products", publicLoanProductsRouter);
 publicRouter.use("/calculator-settings", publicCalculatorRouter);
 publicRouter.use("/news", publicNewsRouter);
+publicRouter.use("/payment-accounts", publicPaymentAccountsRouter);
 publicRouter.use("/applications", publicApplicationsRouter);
 
 // ─── Admin (Bearer Supabase JWT + is_admin) ────────────
@@ -56,6 +61,7 @@ adminRouter.use("/site-settings", adminSiteSettingsRouter);
 adminRouter.use("/loan-products", adminLoanProductsRouter);
 adminRouter.use("/calculator-settings", adminCalculatorRouter);
 adminRouter.use("/news", adminNewsRouter);
+adminRouter.use("/payment-accounts", adminPaymentAccountsRouter);
 adminRouter.use("/applications", adminApplicationsRouter);
 adminRouter.use("/documents", adminDocumentsRouter);
 

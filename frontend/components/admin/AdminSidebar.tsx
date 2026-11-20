@@ -135,6 +135,12 @@ export default function AdminSidebar() {
           />
 
           <SidebarLink
+            href="/admin/payments"
+            label="Төлбөрийн данс"
+            pathname={pathname}
+          />
+
+          <SidebarLink
             href="/admin/settings"
             label="Вебсайт тохиргоо"
             pathname={pathname}
